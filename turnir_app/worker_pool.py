@@ -1,6 +1,4 @@
-import time
 from datetime import datetime
-from typing import Optional
 import os
 import base64
 import requests
@@ -61,6 +59,6 @@ class WorkerPool:
 
     def get_websocket_token(self) -> str:
         response = requests.get("https://live.vkplay.ru")
-        parsed = BeautifulSoup(response.text)
+        parsed = BeautifulSoup(response.text, "html.parser")
         parsed_config = json.loads(parsed.body.script.text)
         return parsed_config["websocket"]["token"]

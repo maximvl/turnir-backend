@@ -1,4 +1,3 @@
-from multiprocessing import Queue
 import time
 from typing import Optional
 import websocket
@@ -8,7 +7,9 @@ from dataclasses import dataclass
 from turnir_app.types import WorkerState
 
 
-websocket_url = "wss://pubsub.live.vkplay.ru/connection/websocket?cf_protocol_version=v2"
+websocket_url = (
+    "wss://pubsub.live.vkplay.ru/connection/websocket?cf_protocol_version=v2"
+)
 update_interval_seconds = 3
 
 
@@ -21,9 +22,15 @@ class VoteResponse:
 def start_websocket_client(state: WorkerState):
     def handle_message(ws, json_message):
         if state.stop_flag.is_set():
-           print("Stopping...")
-           ws.close()
-           return
+            print("Stopping...")
+            ws.close()
+            return
+
+        if state.reset_flag.is_set():
+            print("Resetting...")
+            state.votes.clear()
+            state.voters.clear()
+            state.reset_flag.clear()
 
         response = on_message(ws, json_message)
         if response:
@@ -41,7 +48,10 @@ def start_websocket_client(state: WorkerState):
         on_open=on_open,
         header={"Origin": "https://live.vkplay.ru"},
     )
-    ws.run_forever(reconnect=5, skip_utf8_validation=True,)
+    ws.run_forever(
+        reconnect=5,
+        skip_utf8_validation=True,
+    )
     print("Websocket client stopped")
 
 
@@ -77,7 +87,11 @@ def on_message(ws, json_message) -> Optional[VoteResponse]:
     message_data = pub_data.get("data", {}).get("data", [])
     print("Message data")
     print(message_data)
-    text_items = [d.get("content") for d in message_data if d.get("type") == "text" and d.get("content")]
+    text_items = [
+        d.get("content")
+        for d in message_data
+        if d.get("type") == "text" and d.get("content")
+    ]
 
     if not text_items:
         return None
@@ -85,7 +99,7 @@ def on_message(ws, json_message) -> Optional[VoteResponse]:
     item = json.loads(text_items[0])
     try:
         option_id = int(item[0])
-    except:
+    except Exception:
         return None
 
     author_id = pub_data.get("data", {}).get("author", {}).get("id")
@@ -100,24 +114,30 @@ def on_error(ws, error):
     print(error)
     print("*** WS Error ***")
 
+
 def on_close(ws, status_code, msg):
-    print('*** WS Closed ***')
+    print("*** WS Closed ***")
     print(status_code)
     print(msg)
-    print('*** WS Closed ***')
+    print("*** WS Closed ***")
+
 
 def send_initial_messages(state, ws):
-    initial_message = json.dumps({
-      "connect": {
-        "token": state.websocket_token,
-        "name": "js",
-      },
-      "id": 1,
-    })
+    initial_message = json.dumps(
+        {
+            "connect": {
+                "token": state.websocket_token,
+                "name": "js",
+            },
+            "id": 1,
+        }
+    )
     ws.send(initial_message)
 
-    subscribe_message = json.dumps({
-        "subscribe": { "channel": "channel-chat:8845069" },
-        "id": 2,
-    })
+    subscribe_message = json.dumps(
+        {
+            "subscribe": {"channel": "channel-chat:8845069"},
+            "id": 2,
+        }
+    )
     ws.send(subscribe_message)

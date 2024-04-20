@@ -1,10 +1,9 @@
-from dataclasses import dataclass
 from multiprocessing import Process, Queue, Event
 from queue import Empty
 import time
 
-from .websocket_client import start_websocket_client
-from .types import WorkerState
+from turnir_app.websocket_client import start_websocket_client
+from turnir_app.types import WorkerState
 
 
 class Worker:
@@ -18,7 +17,12 @@ class Worker:
         self.id = id
         self.started_at = int(time.time())
         self.queue = Queue()
-        self.state = WorkerState(self.queue, stop_flag=Event(), websocket_token=websocket_token)
+        self.state = WorkerState(
+            self.queue,
+            websocket_token=websocket_token,
+            stop_flag=Event(),
+            reset_flag=Event(),
+        )
         self.process = Process(target=start_websocket_client, args=(self.state,))
 
     def start(self) -> None:
@@ -40,3 +44,6 @@ class Worker:
         except Empty:
             pass
         return last_message
+
+    def reset_voting(self):
+        self.state.reset_flag.set()
