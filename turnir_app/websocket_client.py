@@ -29,6 +29,9 @@ def start_websocket_client(state: WorkerState):
         if response:
             handle_vote_response(state, response)
 
+    def on_open(ws):
+        send_initial_messages(state, ws)
+
     print("Starting websocket client")
     ws = websocket.WebSocketApp(
         websocket_url,
@@ -103,11 +106,10 @@ def on_close(ws, status_code, msg):
     print(msg)
     print('*** WS Closed ***')
 
-def on_open(ws):
+def send_initial_messages(state, ws):
     initial_message = json.dumps({
       "connect": {
-          "token":
-          "token",
+        "token": state.websocket_token,
         "name": "js",
       },
       "id": 1,

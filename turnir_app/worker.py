@@ -14,11 +14,11 @@ class Worker:
     id: str
     started_at: int
 
-    def __init__(self, id) -> None:
+    def __init__(self, id: str, websocket_token: str) -> None:
         self.id = id
         self.started_at = int(time.time())
         self.queue = Queue()
-        self.state = WorkerState(self.queue, stop_flag=Event())
+        self.state = WorkerState(self.queue, stop_flag=Event(), websocket_token=websocket_token)
         self.process = Process(target=start_websocket_client, args=(self.state,))
 
     def start(self) -> None:

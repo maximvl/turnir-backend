@@ -3,7 +3,11 @@ from datetime import datetime
 from typing import Optional
 import os
 import base64
+import requests
+import json
+from bs4 import BeautifulSoup
 from turnir_app.worker import Worker
+
 
 class TooManyWorkersException(Exception):
     pass
@@ -13,14 +17,17 @@ class WorkerPool:
     workers_map: dict[str, Worker] = {}
     all_workers: list[Worker] = []
     workers_limit: int
+    websocket_token: str
 
     def __init__(self, workers_limit: int = 10):
         self.workers_limit = workers_limit
+        self.websocket_token = self.get_websocket_token()
+        # print(f"Websocket token: {self.websocket_token}")
 
     def create_worker(self, worker_id: str) -> Worker:
         if len(self.workers_map) >= self.workers_limit:
             raise TooManyWorkersException("Workers limit exceeded")
-        worker = Worker(id=worker_id)
+        worker = Worker(id=worker_id, websocket_token=self.websocket_token)
         self.workers_map[worker_id] = worker
         self.all_workers.append(worker)
         worker.start()
@@ -51,3 +58,9 @@ class WorkerPool:
             }
             for worker in self.all_workers
         ]
+
+    def get_websocket_token(self) -> str:
+        response = requests.get("https://live.vkplay.ru")
+        parsed = BeautifulSoup(response.text)
+        parsed_config = json.loads(parsed.body.script.text)
+        return parsed_config["websocket"]["token"]
