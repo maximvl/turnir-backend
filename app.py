@@ -13,8 +13,8 @@ app.secret_key = 'SECRET'
 
 worker_pool = WorkerPool(workers_limit=30)
 
-@app.route('/')
-def index():
+@app.route('/turnir-api/votes')
+def get_votes():
     session_key = 'pid'
     worker_id = session.get(session_key) or worker_pool.get_random_id()
     session[session_key] = worker_id
@@ -22,11 +22,11 @@ def index():
     message = worker.get_last_message()
     return {"poll_votes": message}
 
-@app.route('/reset')
+@app.route('/turnir-api/reset')
 def reset():
     workers = worker_pool.reset()
     return "ok"
 
-@app.route('/status')
+@app.route('/turnir-api/status')
 def status():
     return worker_pool.get_status()
