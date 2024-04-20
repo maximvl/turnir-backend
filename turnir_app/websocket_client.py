@@ -29,7 +29,7 @@ def start_websocket_client(state: WorkerState):
         if response:
             handle_vote_response(state, response)
 
-    print("Starting websocket client"")
+    print("Starting websocket client")
     ws = websocket.WebSocketApp(
         websocket_url,
         on_message=handle_message,
