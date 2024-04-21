@@ -11,9 +11,11 @@ worker_pool = WorkerPool(workers_limit=30)
 @app.route("/turnir-api/votes")
 def get_votes():
     session_key = "pid"
-    worker_id = session.get(session_key) or worker_pool.get_random_id()
-    session[session_key] = worker_id
-    worker = worker_pool.get_or_create_worker(session[session_key])
+    worker_id = session.get(session_key)
+    if not worker_id:
+        worker_id = worker_pool.get_random_id()
+        session[session_key] = worker_id
+    worker = worker_pool.get_or_create_worker(worker_id)
     message = worker.get_last_message()
     return {"poll_votes": message}
 
@@ -21,11 +23,13 @@ def get_votes():
 @app.route("/turnir-api/votes/reset")
 def votes_reset():
     session_key = "pid"
-    worker_id = session.get(session_key) or worker_pool.get_random_id()
-    session[session_key] = worker_id
-    worker = worker_pool.get_or_create_worker(session[session_key])
+    worker_id = session.get(session_key)
+    if not worker_id:
+        worker_id = worker_pool.get_random_id()
+        session[session_key] = worker_id
+    worker = worker_pool.get_or_create_worker(worker_id)
     worker.reset_voting()
-    return "ok"
+    return {"status": "ok"}
 
 
 @app.route("/turnir-api/reset")
