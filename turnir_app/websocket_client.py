@@ -1,3 +1,4 @@
+import os
 import time
 from typing import Optional
 import websocket
@@ -140,6 +141,9 @@ def on_close(ws, status_code, msg):
 def send_initial_messages(state, ws):
     lasqa_channel = "channel-chat:8845069"
     roadhouse_channel = "channel-chat:6367818"
+    channel = os.getenv("VK_CHANNEL", lasqa_channel)
+
+    print("Subscribing to", channel)
 
     initial_message = json.dumps(
         {
@@ -154,7 +158,7 @@ def send_initial_messages(state, ws):
 
     subscribe_message = json.dumps(
         {
-            "subscribe": {"channel": lasqa_channel},
+            "subscribe": {"channel": channel},
             "id": 2,
         }
     )
