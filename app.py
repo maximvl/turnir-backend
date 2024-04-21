@@ -1,10 +1,11 @@
 from flask import Flask, send_from_directory, session, request
+from turnir_app import settings
 from turnir_app.worker import Worker
 from turnir_app.worker_pool import WorkerPool
 
 app = Flask(__name__)
 
-app.secret_key = "SECRET"
+app.secret_key = settings.cookie_secret
 
 worker_pool = WorkerPool(workers_limit=30)
 

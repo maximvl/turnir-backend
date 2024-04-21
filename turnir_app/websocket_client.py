@@ -5,13 +5,13 @@ import websocket
 import json
 from dataclasses import dataclass
 
+from turnir_app import settings
 from turnir_app.types import ResetCommand, StopCommand, WorkerState
 
 
 websocket_url = (
     "wss://pubsub.live.vkplay.ru/connection/websocket?cf_protocol_version=v2"
 )
-update_interval_seconds = 3
 
 
 @dataclass
@@ -70,7 +70,9 @@ def handle_vote_response(state: WorkerState, response: VoteResponse) -> None:
         print("ignoring", response)
         return
 
-    if response.voter_id in state.voters:
+    is_duplicate = response.voter_id in state.voters
+
+    if is_duplicate and not settings.allow_duplicate_votes:
         print("already voted", response)
         return
 
@@ -81,7 +83,7 @@ def handle_vote_response(state: WorkerState, response: VoteResponse) -> None:
     state.voters.add(response.voter_id)
 
     now = int(time.time())
-    if (now - state.last_update_at) > update_interval_seconds:
+    if (now - state.last_update_at) > settings.votes_update_interval_seconds:
         state.last_update_at = now
         state.votes_queue.put(state.votes.copy())
 
@@ -139,11 +141,9 @@ def on_close(ws, status_code, msg):
 
 
 def send_initial_messages(state, ws):
-    lasqa_channel = "channel-chat:8845069"
-    roadhouse_channel = "channel-chat:6367818"
-    channel = os.getenv("VK_CHANNEL", lasqa_channel)
 
-    print("Subscribing to", channel)
+
+    print("Subscribing to", settings.vk_channel)
 
     initial_message = json.dumps(
         {
@@ -158,7 +158,7 @@ def send_initial_messages(state, ws):
 
     subscribe_message = json.dumps(
         {
-            "subscribe": {"channel": channel},
+            "subscribe": {"channel": settings.vk_channel},
             "id": 2,
         }
     )
