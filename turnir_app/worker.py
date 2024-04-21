@@ -3,12 +3,11 @@ from queue import Empty
 import time
 
 from turnir_app.websocket_client import start_websocket_client
-from turnir_app.types import WorkerState
+from turnir_app.types import ResetCommand, StopCommand, WorkerState
 
 
 class Worker:
     process: Process
-    queue: Queue
     state: WorkerState
     id: str
     started_at: int
@@ -16,12 +15,14 @@ class Worker:
     def __init__(self, id: str, websocket_token: str) -> None:
         self.id = id
         self.started_at = int(time.time())
-        self.queue = Queue()
+        control_queue = Queue()
+        votes_queue = Queue()
         self.state = WorkerState(
-            self.queue,
+            votes_queue=votes_queue,
+            control_queue=control_queue,
             websocket_token=websocket_token,
             stop_flag=Event(),
-            reset_flag=Event(),
+            vote_options=[],
         )
         self.process = Process(target=start_websocket_client, args=(self.state,))
 
@@ -29,7 +30,7 @@ class Worker:
         self.process.start()
 
     def stop(self) -> None:
-        self.state.stop_flag.set()
+        self.state.control_queue.put(StopCommand())
 
     def hard_stop(self) -> None:
         self.process.terminate()
@@ -40,10 +41,10 @@ class Worker:
         last_message = None
         try:
             while True:
-                last_message = self.queue.get_nowait()
+                last_message = self.state.votes_queue.get_nowait()
         except Empty:
             pass
         return last_message
 
-    def reset_voting(self):
-        self.state.reset_flag.set()
+    def reset_voting(self, options: list[str]):
+        self.state.control_queue.put(ResetCommand(options=options))

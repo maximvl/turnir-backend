@@ -4,7 +4,7 @@ import websocket
 import json
 from dataclasses import dataclass
 
-from turnir_app.types import WorkerState
+from turnir_app.types import ResetCommand, StopCommand, WorkerState
 
 
 websocket_url = (
@@ -21,16 +21,25 @@ class VoteResponse:
 
 def start_websocket_client(state: WorkerState):
     def handle_message(ws, json_message):
-        if state.stop_flag.is_set():
-            print("Stopping...")
-            ws.close()
-            return
-
-        if state.reset_flag.is_set():
-            print("Resetting...")
-            state.votes.clear()
-            state.voters.clear()
-            state.reset_flag.clear()
+        command = None
+        try:
+            command = state.control_queue.get_nowait()
+        except Exception:
+            pass
+        match command:
+            case StopCommand():
+                print("Stopping...")
+                ws.close()
+                return
+            case ResetCommand():
+                print("Resetting", command)
+                state.vote_options = command.options
+                state.votes.clear()
+                state.voters.clear()
+            case None:
+                pass
+            case _:
+                print("Unsupported command", command)
 
         response = on_message(ws, json_message)
         if response:
@@ -56,9 +65,15 @@ def start_websocket_client(state: WorkerState):
 
 
 def handle_vote_response(state: WorkerState, response: VoteResponse) -> None:
-    if response.voter_id in state.voters:
+    if str(response.option_id) not in state.vote_options:
+        print("ignoring", response)
         return
 
+    if response.voter_id in state.voters:
+        print("already voted", response)
+        return
+
+    print("counting", response)
     if response.option_id not in state.votes:
         state.votes[response.option_id] = 0
     state.votes[response.option_id] += 1
@@ -67,7 +82,7 @@ def handle_vote_response(state: WorkerState, response: VoteResponse) -> None:
     now = int(time.time())
     if (now - state.last_update_at) > update_interval_seconds:
         state.last_update_at = now
-        state.queue.put(state.votes.copy())
+        state.votes_queue.put(state.votes.copy())
 
 
 def on_message(ws, json_message) -> Optional[VoteResponse]:
@@ -85,8 +100,8 @@ def on_message(ws, json_message) -> Optional[VoteResponse]:
         return None
 
     message_data = pub_data.get("data", {}).get("data", [])
-    print("Message data")
-    print(message_data)
+    # print("Message data")
+    # print(message_data)
     text_items = [
         d.get("content")
         for d in message_data
@@ -123,6 +138,9 @@ def on_close(ws, status_code, msg):
 
 
 def send_initial_messages(state, ws):
+    lasqa_channel = "channel-chat:8845069"
+    roadhouse_channel = "channel-chat:6367818"
+
     initial_message = json.dumps(
         {
             "connect": {
@@ -136,7 +154,7 @@ def send_initial_messages(state, ws):
 
     subscribe_message = json.dumps(
         {
-            "subscribe": {"channel": "channel-chat:8845069"},
+            "subscribe": {"channel": lasqa_channel},
             "id": 2,
         }
     )
