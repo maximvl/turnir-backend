@@ -54,7 +54,7 @@ async def handle_message(ws: WebSocketClientProtocol, json_message: Data):
 async def on_message(
     ws: WebSocketClientProtocol, json_message: Data
 ) -> Optional[VoteResponse]:
-    print(f" <- {json_message}")
+    # print(f" <- {json_message}")
     if json_message == "{}":
         await ws.send("{}")
         return None
