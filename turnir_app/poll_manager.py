@@ -49,8 +49,6 @@ class PollsManager:
         return base64.urlsafe_b64encode(os.urandom(6)).decode()
 
     def get_all_for_channel(self, channel: str) -> list[Poll]:
-        print(self.polls.values())
-        print(channel)
         return [poll for poll in self.polls.values() if poll.channel == channel]
 
 

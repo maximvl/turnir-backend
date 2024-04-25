@@ -1,14 +1,16 @@
-import asyncio
-import signal
-from typing import Optional
+from typing import Callable, Optional
 import requests
 from bs4 import BeautifulSoup
 import websockets
 import json
 from dataclasses import dataclass
+import logging
 
 from websockets import WebSocketClientProtocol, Data
 from turnir_app import poll_manager, settings
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 websocket_url = (
@@ -25,22 +27,20 @@ class VoteResponse:
     channel: str
 
 
-async def start_websocket_client():
-    print("Starting websocket client")
+async def start_websocket_client(should_deactivate: Callable[[], bool]):
+    logger.info("Starting websocket client")
     token = get_websocket_token()
     async with websockets.connect(
         websocket_url,
         extra_headers={"Origin": "https://live.vkplay.ru"},
     ) as websocket:
-        # close websocket on SIGTERM
-        loop = asyncio.get_running_loop()
-        loop.add_signal_handler(signal.SIGTERM, loop.create_task, websocket.close())
-
         await send_initial_messages(websocket, token=token)
         async for message in websocket:
+            if should_deactivate():
+                await websocket.close()
+                break
             await handle_message(websocket, message)
-
-    print("Websocket client stopped")
+    logger.info("Websocket client stopped")
 
 
 async def handle_message(ws: WebSocketClientProtocol, json_message: Data):
@@ -98,7 +98,7 @@ async def on_message(
 
 
 async def send_initial_messages(ws: websockets.WebSocketClientProtocol, token: str):
-    print("Subscribing to", settings.vk_channel)
+    logger.info("Subscribing to %s", settings.vk_channel)
 
     initial_message = json.dumps(
         {

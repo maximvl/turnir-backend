@@ -1,14 +1,25 @@
 import asyncio
+import signal
+import logging
 from quart import Quart, request, session, send_from_directory
 
 from turnir_app import settings
 from turnir_app.poll_manager import get_manager
-from turnir_app.websocket_client import start_websocket_client
+from turnir_app.websocket_controller import get_controller
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s.%(msecs)03d] [%(levelname)s] %(module)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+)
+logger = logging.getLogger(__name__)
 
 
 app = Quart(__name__)
 app.secret_key = settings.cookie_secret
 poll_manager = get_manager()
+ws_controller = get_controller()
 
 
 @app.route("/turnir")
@@ -23,6 +34,7 @@ async def static_js(path):
 
 @app.route("/turnir-api/votes", methods=["GET"])
 async def get_votes():
+    ws_controller.start()
     session_key = "pid"
     state_id = session.get(session_key)
     if not state_id:
@@ -37,6 +49,7 @@ async def get_votes():
 
 @app.route("/turnir-api/votes/reset", methods=["POST"])
 async def votes_reset():
+    ws_controller.start()
     body = await request.get_json()
     vote_options = body.get("vote_options")
 
@@ -50,21 +63,27 @@ async def votes_reset():
     return {"status": "ok"}
 
 
-# @app.route("/turnir-api/reset")
-# async def reset():
-#     worker_pool.reset()
-#     return "ok"
-
-
-# @app.route("/turnir-api/status")
-# async def status():
-#     return worker_pool.get_status()
+def shutdown(trigger: asyncio.Event):
+    logger.info("Cancelling tasks")
+    trigger.set()
+    tasks = asyncio.all_tasks()
+    [task.cancel() for task in tasks]
+    logger.info("Shutdown")
 
 
 async def main():
-    await asyncio.gather(start_websocket_client(), app.run_task(debug=True))
+    trigger = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    loop.add_signal_handler(signal.SIGTERM, shutdown, trigger)
+    loop.add_signal_handler(signal.SIGINT, shutdown, trigger)
+
+    async with asyncio.TaskGroup() as tg:
+        tg.create_task(app.run_task(shutdown_trigger=trigger.wait))
+        tg.create_task(ws_controller.wait_to_start())
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
-    # asyncio.run(start_websocket_client())
+    try:
+        asyncio.run(main())
+    except asyncio.CancelledError:
+        pass
