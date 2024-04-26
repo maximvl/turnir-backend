@@ -82,8 +82,12 @@ async def main():
         tg.create_task(ws_controller.wait_to_start())
 
 
-if __name__ == "__main__":
+def start():
     try:
         asyncio.run(main())
     except asyncio.CancelledError:
         pass
+
+
+if __name__ == "__main__":
+    start()
