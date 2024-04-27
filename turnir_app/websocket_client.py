@@ -1,4 +1,3 @@
-import os
 import time
 from typing import Optional
 import websocket
@@ -34,8 +33,8 @@ def start_websocket_client(state: WorkerState):
                 return
             case ResetCommand():
                 print("Resetting", command)
-                state.vote_options = command.options
                 state.votes.clear()
+                state.votes.update({option: 0 for option in command.options})
                 state.voters.clear()
             case None:
                 pass
@@ -66,7 +65,7 @@ def start_websocket_client(state: WorkerState):
 
 
 def handle_vote_response(state: WorkerState, response: VoteResponse) -> None:
-    if str(response.option_id) not in state.vote_options:
+    if str(response.option_id) not in state.votes:
         print("ignoring", response)
         return
 
@@ -77,9 +76,7 @@ def handle_vote_response(state: WorkerState, response: VoteResponse) -> None:
         return
 
     print("counting", response)
-    if response.option_id not in state.votes:
-        state.votes[response.option_id] = 0
-    state.votes[response.option_id] += 1
+    state.votes[str(response.option_id)] += 1
     state.voters.add(response.voter_id)
 
     now = int(time.time())

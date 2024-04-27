@@ -22,7 +22,6 @@ class Worker:
             control_queue=control_queue,
             websocket_token=websocket_token,
             stop_flag=Event(),
-            vote_options=[],
         )
         self.process = Process(target=start_websocket_client, args=(self.state,))
 
