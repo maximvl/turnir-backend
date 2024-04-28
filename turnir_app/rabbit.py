@@ -5,7 +5,12 @@ import json
 
 
 def get_connection():
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host=settings.rabbit_host))
+    credentials = pika.PlainCredentials(settings.rabbit_user, settings.rabbit_pass)
+    connection = pika.BlockingConnection(pika.ConnectionParameters(
+        host=settings.rabbit_host,
+        virtual_host=settings.rabbit_vhost,
+        credentials=credentials
+    ))
     channel = connection.channel()
     channel.queue_declare(queue=settings.control_queue_name)
     channel.queue_declare(queue=settings.votes_queue_name)
