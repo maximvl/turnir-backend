@@ -1,6 +1,8 @@
-from flask import Flask, send_from_directory
+from flask import Flask, request, send_from_directory, session
+import zerorpc
 import settings
-from turnir_app import rabbit
+import os
+import base64
 
 app = Flask(__name__)
 
@@ -17,16 +19,50 @@ def static_js(path):
     return send_from_directory("../turnir/build/static/", path)
 
 
+def get_random_id() -> str:
+    return base64.urlsafe_b64encode(os.urandom(6)).decode()
+
+def get_rcp_connection():
+    client = zerorpc.Client()
+    client.connect(settings.rpc_address)
+    return client
+
+
+client_id_key = "client_id"
+
+
 @app.route("/turnir-api/votes", methods=["GET"])
 def get_votes():
-    connection = rabbit.get_connection()
-    rabbit.ping_chat_reader(connection)
-    messages = list(rabbit.read_all_messages(connection))
+    if not client_id_key in session:
+        client_id = get_random_id()
+        session[client_id_key] = client_id
+    else:
+        client_id = session[client_id_key]
+
+    ts_from = request.args.get("ts")
+    if not ts_from:
+        return {"error": "ts is required"}
+
+    try:
+        ts_from = int(ts_from)
+    except Exception:
+        return {"error": "ts should be a number"}
+
+    rpc = get_rcp_connection()
+    messages = rpc.get_messages(client_id, ts_from)
+    rpc.close()
     return {"poll_votes": messages}
 
 
 @app.route("/turnir-api/votes/reset", methods=["POST"])
 def votes_reset():
-    connection = rabbit.get_connection()
-    rabbit.clear_vote_messages(connection)
+    if not client_id_key in session:
+        client_id = get_random_id()
+        session[client_id_key] = client_id
+    else:
+        client_id = session[client_id_key]
+
+    rpc = get_rcp_connection()
+    rpc.reset_reader(client_id)
+    rpc.close()
     return {"status": "ok"}
