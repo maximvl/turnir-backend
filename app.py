@@ -22,7 +22,7 @@ def static_js(path):
 def get_random_id() -> str:
     return base64.urlsafe_b64encode(os.urandom(6)).decode()
 
-def get_rcp_connection():
+def get_rpc_connection():
     client = zerorpc.Client()
     client.connect(settings.rpc_address)
     return client
@@ -48,7 +48,7 @@ def get_votes():
     except Exception:
         return {"error": "ts should be a number"}
 
-    rpc = get_rcp_connection()
+    rpc = get_rpc_connection()
     messages = rpc.get_messages(client_id, ts_from)
     rpc.close()
     return {"poll_votes": messages}
@@ -62,7 +62,15 @@ def votes_reset():
     else:
         client_id = session[client_id_key]
 
-    rpc = get_rcp_connection()
+    rpc = get_rpc_connection()
     rpc.reset_reader(client_id)
+    rpc.close()
+    return {"status": "ok"}
+
+
+@app.route("/turnir-api/ping", methods=["GET"])
+def ping():
+    rpc = get_rpc_connection()
+    rpc.ping()
     rpc.close()
     return {"status": "ok"}
