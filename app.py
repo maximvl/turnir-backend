@@ -45,7 +45,7 @@ class ZmqConnection:
         raise Exception(f"Error while getting messages: {received}")
 
     def reset_client(self, client_id: str) -> None:
-        self.socket.send_json({"command": "reset_reader", "client_id": client_id})
+        self.socket.send_json({"command": "reset_client", "client_id": client_id})
         received = self.socket.recv_json()
         if isinstance(received, dict) and received.get("status") == "ok":
             return
