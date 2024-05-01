@@ -30,6 +30,7 @@ class ZmqConnection:
     def __init__(self) -> None:
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.REQ)
+        self.socket.setsockopt(zmq.IPV6, 1)
         self.socket.connect(settings.zeromq_address)
 
     def close(self) -> None:
