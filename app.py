@@ -3,10 +3,15 @@ import settings
 import os
 import base64
 import zmq
+from db_connector import Preset, db, init_db, save_preset, serialize_preset
+from zmq_connector import ZmqConnection
+import json
+from datetime import datetime
 
 
 app = Flask(__name__)
 app.secret_key = settings.cookie_secret
+init_db(app)
 
 
 @app.route("/turnir")
@@ -23,60 +28,19 @@ def get_random_id() -> str:
     return base64.urlsafe_b64encode(os.urandom(6)).decode()
 
 
-class ZmqConnection:
-    context: zmq.Context
-    socket: zmq.Socket
-
-    def __init__(self) -> None:
-        self.context = zmq.Context()
-        self.socket = self.context.socket(zmq.REQ)
-        self.socket.setsockopt(zmq.IPV6, 1)
-        self.socket.connect(settings.zeromq_address)
-
-    def close(self) -> None:
-        self.socket.close()
-        self.context.term()
-
-    def get_messages(self, client_id: str, ts_from: int) -> list[dict]:
-        self.socket.send_json({"command": "get_messages", "client_id": client_id, "ts_from": ts_from})
-        received = self.socket.recv_json()
-        if isinstance(received, dict) and received.get("status") == "ok":
-            return received.get("messages")
-        raise Exception(f"Error while getting messages: {received}")
-
-    def reset_client(self, client_id: str) -> None:
-        self.socket.send_json({"command": "reset_client", "client_id": client_id})
-        received = self.socket.recv_json()
-        if isinstance(received, dict) and received.get("status") == "ok":
-            return
-        raise Exception(f"Error while resetting client: {received}")
-
-    def clear_storage(self) -> None:
-        self.socket.send_json({"command": "clear_storage"})
-        received = self.socket.recv_json()
-        if isinstance(received, dict) and received.get("status") == "ok":
-            return
-        raise Exception(f"Error while clearing storage: {received}")
-
-    def ping(self) -> None:
-        self.socket.send_json({"command": "ping"})
-        received = self.socket.recv_json()
-        if isinstance(received, dict) and received.get("status") == "ok":
-            return
-        raise Exception(f"Error while pinging: {received}")
-
-
-client_id_key = "client_id"
-
-
-@app.route("/turnir-api/votes", methods=["GET"])
-def get_votes():
+def get_client_id() -> str:
+    client_id_key = "client_id"
     if not client_id_key in session:
         client_id = get_random_id()
         session[client_id_key] = client_id
     else:
         client_id = session[client_id_key]
+    return client_id
 
+
+@app.route("/turnir-api/votes", methods=["GET"])
+def get_votes():
+    client_id = get_client_id()
     ts_from = request.args.get("ts")
     if not ts_from:
         return {"error": "ts is required"}
@@ -94,16 +58,38 @@ def get_votes():
 
 @app.route("/turnir-api/votes/reset", methods=["POST"])
 def votes_reset():
-    if not client_id_key in session:
-        client_id = get_random_id()
-        session[client_id_key] = client_id
-    else:
-        client_id = session[client_id_key]
-
+    client_id = get_client_id()
     connection = ZmqConnection()
     connection.reset_client(client_id)
     connection.close()
     return {"status": "ok"}
+
+
+@app.route("/turnir-api/preset/", methods=["POST"])
+def create_preset():
+    client_id = get_client_id()
+    preset_id = get_random_id()
+
+    data = request.json
+    if not isinstance(data, dict):
+        return {"error": "Data should be a json"}
+
+    preset = Preset(
+        id=preset_id,
+        title=data.get("title", ""),
+        author_id=client_id,
+        options=json.dumps(data["options"]),
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    ) # pyright: ignore
+    save_preset(preset)
+    return serialize_preset(preset)
+
+
+@app.route("/turnir-api/preset/<id>", methods=["GET"])
+def get_preset(id: str):
+    preset = Preset.query.get_or_404(id)
+    return serialize_preset(preset)
 
 
 @app.route("/turnir-api/ping", methods=["GET"])
