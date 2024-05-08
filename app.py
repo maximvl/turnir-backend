@@ -77,7 +77,7 @@ def create_preset():
     preset = Preset(
         id=preset_id,
         title=data.get("title", ""),
-        author_id=client_id,
+        owner_id=client_id,
         options=json.dumps(data["options"]),
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow()
@@ -89,6 +89,29 @@ def create_preset():
 @app.route("/turnir-api/preset/<id>", methods=["GET"])
 def get_preset(id: str):
     preset = Preset.query.get_or_404(id)
+    return serialize_preset(preset)
+
+
+@app.route("/turnir-api/preset/<id>", methods=["POST"])
+def update_preset(id: str):
+    client_id = get_client_id()
+
+    data = request.json
+    if not isinstance(data, dict):
+        return {"error": "Data should be a json"}
+
+    preset = Preset.query.get_or_404(id)
+    if preset.owner_id != client_id:
+        return {"error": "You are not the owner of the preset"}
+
+    if "title" in data:
+        preset.title = data.get("title")
+        preset.updated_at = datetime.utcnow()
+    if "options" in data:
+        preset.options = json.dumps(data.get("options"))
+        preset.updated_at = datetime.utcnow()
+
+    db.session.commit()
     return serialize_preset(preset)
 
 

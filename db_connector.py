@@ -11,7 +11,7 @@ db = SQLAlchemy(model_class=Base)
 class Preset(db.Model):
     id: Mapped[str] = mapped_column(primary_key=True)
     title: Mapped[str]
-    author_id: Mapped[str]
+    owner_id: Mapped[str]
     created_at: Mapped[datetime]
     updated_at: Mapped[datetime]
     options: Mapped[str]
@@ -37,7 +37,7 @@ def serialize_preset(preset: Preset) -> dict:
     return {
         "id": preset.id,
         "title": preset.title,
-        "author_id": preset.author_id,
+        "owner_id": preset.owner_id,
         "created_at": preset.created_at,
         "updated_at": preset.updated_at,
         "options": json.loads(preset.options)
