@@ -65,7 +65,7 @@ def votes_reset():
     return {"status": "ok"}
 
 
-@app.route("/turnir-api/preset/", methods=["POST"])
+@app.route("/turnir-api/presets/", methods=["POST"])
 def create_preset():
     client_id = get_client_id()
     preset_id = get_random_id()
@@ -86,13 +86,13 @@ def create_preset():
     return serialize_preset(preset)
 
 
-@app.route("/turnir-api/preset/<id>", methods=["GET"])
+@app.route("/turnir-api/presets/<id>", methods=["GET"])
 def get_preset(id: str):
     preset = Preset.query.get_or_404(id)
     return serialize_preset(preset)
 
 
-@app.route("/turnir-api/preset/<id>", methods=["POST"])
+@app.route("/turnir-api/presets/<id>", methods=["POST"])
 def update_preset(id: str):
     client_id = get_client_id()
 
