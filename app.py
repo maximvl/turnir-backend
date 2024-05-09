@@ -43,12 +43,12 @@ def get_votes():
     client_id = get_client_id()
     ts_from = request.args.get("ts")
     if not ts_from:
-        return {"error": "ts is required"}
+        return {"error": "ts is required"}, 400
 
     try:
         ts_from = int(ts_from)
     except Exception:
-        return {"error": "ts should be a number"}
+        return {"error": "ts should be a number"}, 400
 
     connection = ZmqConnection()
     messages = connection.get_messages(client_id, ts_from)
@@ -72,7 +72,7 @@ def create_preset():
 
     data = request.json
     if not isinstance(data, dict):
-        return {"error": "Data should be a json"}
+        return {"error": "Data should be a json"}, 400
 
     preset = Preset(
         id=preset_id,
@@ -98,11 +98,11 @@ def update_preset(id: str):
 
     data = request.json
     if not isinstance(data, dict):
-        return {"error": "Data should be a json"}
+        return {"error": "Data should be a json"}, 400
 
     preset = Preset.query.get_or_404(id)
     if preset.owner_id != client_id:
-        return {"error": "You are not the owner of the preset"}
+        return {"error": "You are not the owner of the preset", "error_code": "not_owner"}, 400
 
     if "title" in data:
         preset.title = data.get("title")
